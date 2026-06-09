@@ -14,11 +14,13 @@ This project scrapes those verse pairs, cleans the text, and saves them as struc
 
 ### What happens when you run it
 
-1. A pool of Chrome browsers opens (in the background) and works through every book and chapter of the Bible in parallel.
-2. For each verse, the scraper fetches the local-language text and the English reference text (CEB version).
-3. If both sides are present, the pair is saved. If either side is missing, the verse is skipped.
-4. English verses are cached so they are only fetched once across all languages.
-5. Progress is saved after every chapter so a run can be interrupted and resumed without losing work.
+1. The script checks that you have Google Chrome installed and auto-installs any missing Python dependencies.
+2. It shows you a table of all unassigned language versions and asks you to enter a version ID.
+3. A pool of Chrome browsers opens (in the background) and works through every book and chapter of the Bible in parallel.
+4. For each verse, the scraper fetches the local-language text and the English reference text (CEB version).
+5. If both sides are present, the pair is saved. If either side is missing, the verse is skipped.
+6. English verses are cached so they are only fetched once across all languages.
+7. Progress is saved after every chapter so a run can be interrupted and resumed without losing work.
 
 ### Output files
 
@@ -26,15 +28,16 @@ Everything is written to `bible_parallel_text_datasets/`:
 
 ```
 bible_parallel_text_datasets/
-    english_cache.csv        verse_key, eng
-    Asante_Twi_twi.csv       verse_key, version_id, eng, local
-    Ewe_ee.csv
-    Ga_gaa.csv
+    english_cache.csv            verse_key, eng
+    Asante_Twi_twi_v1461.csv    verse_key, version_id, eng, local
+    Asante_Twi_twi_v1861.csv
+    Ga_gaa_v2708.csv
+    Ewe_ewe_v1613.csv
     progress.json
     testament_status.json
 ```
 
-One CSV per language, named `{Language_Name}_{lang_code}.csv`. The English cache is shared across all languages so it is only built once.
+One CSV per **version**, named `{Language_Name}_{lang_code}_v{version_id}.csv`. This means two versions of the same language produce two separate files. The English cache is shared across all runs so it is only built once.
 
 Each language CSV has four columns:
 
@@ -53,26 +56,21 @@ Each language CSV has four columns:
 
 - Python 3.10 or later
 - Google Chrome installed
-- A `youversion_ghana_versions.csv` file listing the versions to scrape (see format below)
 
-### Install dependencies
-
-```bash
-pip install selenium webdriver-manager pandas datasets huggingface_hub
-```
+> All Python dependencies are installed automatically on first run. You do not need to run `pip install` yourself.
 
 ### Clone and run
 
 ```bash
 git clone https://github.com/ghananlpcommunity/Ghana-MT-PC.git
 cd Ghana-MT-PC
-```
-
-Create your versions file (see format below), then run the scraper:
-
-```bash
 python youversion_parallel_text_builder.py
 ```
+
+The script will:
+1. Ask you to confirm you have Chrome installed
+2. Install any missing packages automatically
+3. Show the available versions table and prompt you for a version ID
 
 Once scraping is done, merge and push to HuggingFace:
 
@@ -88,11 +86,45 @@ The scraper reads a CSV called `youversion_ghana_versions.csv`. Each row is one 
 version_id,lang_code,lang_name,abbr
 1461,twi,Asante Twi,ASCMB
 1861,twi,Asante Twi,TWI
-2708,ee,Ewe,NEGAB
-3625,gaa,Ga,GAAGB
+2708,gaa,Ga,GAAGB
+1613,ewe,Ewe,EWE
 ```
 
 `abbr` is the version abbreviation used in YouVersion URLs. It is optional but recommended — some versions require it to load correctly.
+
+### Selecting a version to scrape
+
+When you run the script you will see a table like this:
+
+```
+============================================================
+  Available versions  (unassigned)
+============================================================
+  Version ID   Language                       Code
+  ------------ ------------------------------ ----------
+  2263         Dagbani                        dag
+  2264         Dagbani                        dag
+  2708         Ga (GAAGB)                     gaa
+  1613         Ewe                            ewe
+  ...
+============================================================
+  ℹ️  5 version(s) not shown — already assigned or done in README.md
+
+  (type a version ID from the table above, or 'q' to quit)
+
+  Enter a version ID to run (or 'q' to quit):
+```
+
+Type the version ID you want to scrape and press Enter. The script will confirm the language name before starting:
+
+```
+  Enter a version ID to run (or 'q' to quit): 2708
+
+  ✅  Version 2708 → Ga (GAAGB) [gaa]
+  Go ahead with this version? [y/n]:
+```
+
+Versions already assigned to a volunteer or marked Done in the README are hidden from the table automatically. Type `q` at any time to quit without running.
 
 ### Tuning the scraper
 
@@ -109,14 +141,16 @@ OUTPUT_ROOT = "./bible_parallel_text_datasets"  # where CSVs are written
 
 ### Resuming an interrupted run
 
-The scraper tracks progress in `bible_parallel_text_datasets/progress.json`. If a run is interrupted for any reason, just run the same command again — already-completed chapters are skipped automatically.
+The scraper tracks progress in `bible_parallel_text_datasets/progress.json`. If a run is interrupted for any reason, just run the same command again and select the same version ID — already-completed chapters are skipped automatically.
+
+> `progress.json` and `testament_status.json` are listed in `.gitignore` and will not be committed to the repository.
 
 ### Pushing to HuggingFace
 
 Edit the config block at the top of `build_and_push_parallel_dataset.py`:
 
 ```python
-LANG_CSV     = "Asante_Twi_twi"   # CSV name without .csv, or None for all languages
+LANG_CSV     = "Ga_gaa_v2708"     # CSV name without .csv, or None for all
 EXISTING_CSV = Path("...")         # path to any existing parallel sentences to merge in
 HF_TOKEN     = "hf_..."           # your HuggingFace write token
 HF_REPO_ID   = "your-org/your-dataset-name"
