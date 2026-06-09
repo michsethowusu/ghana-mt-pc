@@ -190,7 +190,7 @@ def clean_text(text: str) -> str:
                 line += '.'
             processed.append(line)
     text = ' '.join(processed)
-    text = re.sub(r'[\"\'""''\(\)\[\]\{\}]', '', text)
+    text = re.sub(r'[\"\""''\(\)\[\]\{\}]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
     text = re.sub(r'[,.]{2,}', '.', text)
     text = re.sub(r'([,.!?;:])\.', '.', text)
@@ -601,48 +601,6 @@ def load_versions_csv(csv_path: str) -> list:
     return entries
 
 
-def get_assigned_version_ids(readme_path: str = "README.md") -> set[int]:
-    """
-    Parse the README language table and return version IDs that are already
-    assigned — i.e. have a volunteer name or a ✅ Done status.
-    """
-    assigned = set()
-    if not os.path.exists(readme_path):
-        return assigned
-
-    # Regex to extract pipe-separated table rows
-    row_re = re.compile(r"^\s*\|(.+)\|\s*$")
-
-    with open(readme_path, encoding="utf-8") as f:
-        for line in f:
-            m = row_re.match(line)
-            if not m:
-                continue
-            cols = [c.strip() for c in m.group(1).split("|")]
-            # Table columns: Language | Code | Version IDs | Coverage | Volunteer | Status
-            if len(cols) < 6:
-                continue
-            volunteer_col = cols[4]
-            status_col    = cols[5]
-
-            is_done      = "✅" in status_col or "done" in status_col.lower()
-            has_volunteer = (
-                volunteer_col
-                and volunteer_col != "—"
-                and volunteer_col != "-"
-                and volunteer_col.strip() != ""
-            )
-
-            if not (is_done or has_volunteer):
-                continue
-
-            # Extract all version IDs from the Version IDs column (cols[2])
-            for vid in re.findall(r"\d+", cols[2]):
-                assigned.add(int(vid))
-
-    return assigned
-
-
 # ─────────────────────────────────────────────
 # INTERACTIVE LANGUAGE SELECTION
 # ─────────────────────────────────────────────
@@ -652,12 +610,11 @@ def prompt_language_selection(entries: list) -> list:
     Ask the user to enter a YouVersion version ID directly.
     Tells them the language they are running once confirmed.
     """
-    assigned_ids = get_assigned_version_ids()
-    available    = [(vid, lc, ln, ab) for (vid, lc, ln, ab) in entries if vid not in assigned_ids]
+    available    = [(vid, lc, ln, ab) for (vid, lc, ln, ab) in entries]
     available_by_id = {vid: (vid, lc, ln, ab) for (vid, lc, ln, ab) in available}
 
     if not available:
-        print("  All versions are already assigned in README.md.")
+        print("  No versions found in CSV.")
         return []
 
     while True:
@@ -670,10 +627,6 @@ def prompt_language_selection(entries: list) -> list:
             continue
 
         vid = int(raw)
-
-        if vid in assigned_ids:
-            print(f"  ⚠️  Version {vid} is already assigned or marked done in README.md.\n")
-            continue
 
         if vid not in available_by_id:
             print(f"  ⚠️  Version {vid} was not found in the versions CSV.\n")
